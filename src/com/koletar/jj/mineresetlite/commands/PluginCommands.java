@@ -6,9 +6,6 @@ import org.bukkit.command.CommandSender;
 
 import static com.koletar.jj.mineresetlite.Phrases.phrase;
 
-/**
- * @author jjkoletar
- */
 public class PluginCommands {
     private MineResetLite plugin;
 

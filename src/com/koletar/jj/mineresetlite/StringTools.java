@@ -2,18 +2,8 @@ package com.koletar.jj.mineresetlite;
 
 import java.util.List;
 
-
-/**
- * @author jjkoletar
- */
 public class StringTools {
-    /**
-     * Build a spaced argument out of an array of args that don't contain spaces, due to the command delimiter.
-     * @param args String array of args
-     * @param start Number of elements to skip over/index to begin at
-     * @param stop Number of elements at the <b>end of the array</b> to ignore, <u>not</u> a stopping index.
-     * @return Reconstructed spaced argument
-     */
+
     public static String buildSpacedArgument(String[] args, int start, int stop) {
         StringBuilder sb = new StringBuilder();
         for (int i = start; i < args.length - stop; i++) {

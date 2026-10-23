@@ -13,13 +13,6 @@ import java.util.Map;
 
 import static com.koletar.jj.mineresetlite.Phrases.phrase;
 
-/**
- * Specific command manager. Far less genericizied than sk89q's.
- * </p>
- * MRL's command system is very much based on sk89q's command system for WorldEdit.
- *
- * @author jjkoletar
- */
 public class CommandManager {
     private Map<String, Method> commands;
     private Map<Method, Object> instances;
@@ -49,7 +42,7 @@ public class CommandManager {
             min = 0, max = -1)
     public void help(CommandSender sender, String[] args) {
         if (args.length >= 1) {
-            //Subcommand help?
+
             if (commands.containsKey(args[0].toLowerCase())) {
                 Command command = commands.get(args[0].toLowerCase()).getAnnotation(Command.class);
                 sender.sendMessage(phrase("helpUsage", command.aliases()[0], command.usage()));
@@ -64,7 +57,7 @@ public class CommandManager {
             if (!seenMethods.contains(entry.getValue())) {
                 seenMethods.add(entry.getValue());
                 Command command = entry.getValue().getAnnotation(Command.class);
-                //Only show help if the sender can use the command anyway
+
                 if ((command.onlyPlayers() && !(sender instanceof Player))) {
                     continue;
                 }
@@ -85,29 +78,26 @@ public class CommandManager {
     }
 
     public void callCommand(String cmdName, CommandSender sender, String[] args) {
-        //Do we have the command?
+
         Method method = commands.get(cmdName.toLowerCase());
         if (method == null) {
             sender.sendMessage(phrase("unknownCommand"));
             return;
         }
-        //Get annotation
+
         Command command = method.getAnnotation(Command.class);
 
-        //Validate arguments
         if (!(command.min() <= args.length && (command.max() == -1 || command.max() >= args.length))) {
             sender.sendMessage(phrase("invalidArguments"));
             sender.sendMessage(phrase("invalidArgsUsage", command.aliases()[0], command.usage()));
             return;
         }
 
-        //Player or console?
         if (command.onlyPlayers() && !(sender instanceof Player)) {
             sender.sendMessage(phrase("notAPlayer"));
             return;
         }
 
-        //Permission checks
         boolean may = false;
         if (command.permissions().length == 0) {
             may = true;
@@ -122,7 +112,6 @@ public class CommandManager {
             return;
         }
 
-        //Run command
         Object[] methodArgs = {sender, args};
         try {
             method.invoke(instances.get(method), methodArgs);

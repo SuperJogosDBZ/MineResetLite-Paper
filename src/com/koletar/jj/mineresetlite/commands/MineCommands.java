@@ -6,8 +6,7 @@ import com.koletar.jj.mineresetlite.Mine;
 import com.koletar.jj.mineresetlite.MineResetLite;
 import com.koletar.jj.mineresetlite.SerializableBlock;
 import com.koletar.jj.mineresetlite.StringTools;
-import com.sk89q.worldedit.bukkit.WorldEditPlugin;
-import com.sk89q.worldedit.bukkit.selections.Selection;
+
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -23,9 +22,6 @@ import java.util.Set;
 
 import static com.koletar.jj.mineresetlite.Phrases.phrase;
 
-/**
- * @author jjkoletar
- */
 public class MineCommands {
     private MineResetLite plugin;
     private Map<Player, Location> point1;
@@ -56,17 +52,22 @@ public class MineCommands {
     public void setPoint1(CommandSender sender, String[] args) throws InvalidCommandArgumentsException {
         Player player = (Player) sender;
         if (args.length == 0) {
-            //Use block being looked at
-            point1.put(player, player.getTargetBlock((Set) null, 100).getLocation());
+
+            org.bukkit.block.Block target = player.getTargetBlockExact(100);
+            if (target == null) {
+                player.sendMessage(phrase("notABlock"));
+                return;
+            }
+            point1.put(player, target.getLocation());
             player.sendMessage(phrase("firstPointSet"));
             return;
         } else if (args[0].equalsIgnoreCase("-feet")) {
-            //Use block being stood on
+
             point1.put(player, player.getLocation());
             player.sendMessage(phrase("firstPointSet"));
             return;
         }
-        //Args weren't empty or -feet, bad args
+
         throw new InvalidCommandArgumentsException();
     }
 
@@ -80,17 +81,22 @@ public class MineCommands {
     public void setPoint2(CommandSender sender, String[] args) throws InvalidCommandArgumentsException {
         Player player = (Player) sender;
         if (args.length == 0) {
-            //Use block being looked at
-            point2.put(player, player.getTargetBlock((Set) null, 100).getLocation());
+
+            org.bukkit.block.Block target = player.getTargetBlockExact(100);
+            if (target == null) {
+                player.sendMessage(phrase("notABlock"));
+                return;
+            }
+            point2.put(player, target.getLocation());
             player.sendMessage(phrase("secondPointSet"));
             return;
         } else if (args[0].equalsIgnoreCase("-feet")) {
-            //Use block being stood on
+
             point2.put(player, player.getLocation());
             player.sendMessage(phrase("secondPointSet"));
             return;
         }
-        //Args weren't empty or -feet, bad args
+
         throw new InvalidCommandArgumentsException();
     }
 
@@ -102,12 +108,12 @@ public class MineCommands {
             permissions = {"mineresetlite.mine.create"},
             min = 1, max = -1, onlyPlayers = true)
     public void createMine(CommandSender sender, String[] args) {
-        //Find out how they selected the region
+
         Player player = (Player) sender;
         World world = null;
         Vector p1 = null;
         Vector p2 = null;
-        //Native selection techniques?
+
         if (point1.containsKey(player) && point2.containsKey(player)) {
             world = point1.get(player).getWorld();
             if (!world.equals(point2.get(player).getWorld())) {
@@ -117,29 +123,33 @@ public class MineCommands {
             p1 = point1.get(player).toVector();
             p2 = point2.get(player).toVector();
         }
-        //WorldEdit?
-        if (plugin.hasWorldEdit() && plugin.getWorldEdit().getSelection(player) != null) {
-            WorldEditPlugin worldEdit = plugin.getWorldEdit();
-            Selection selection = worldEdit.getSelection(player);
-            world = selection.getWorld();
-            p1 = selection.getMinimumPoint().toVector();
-            p2 = selection.getMaximumPoint().toVector();
+        Location[] selection;
+        try {
+            selection = com.koletar.jj.mineresetlite.WorldEditSelection.get(plugin, player);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            player.sendMessage(ex.getMessage());
+            return;
+        }
+        if (selection != null) {
+            world = selection[0].getWorld();
+            p1 = selection[0].toVector();
+            p2 = selection[1].toVector();
         }
         if (p1 == null) {
             player.sendMessage(phrase("emptySelection"));
             return;
         }
-        //Construct mine name
+
         String name = StringTools.buildSpacedArgument(args);
-        //Verify uniqueness of mine name
+
         Mine[] mines = plugin.matchMines(name);
         if (mines.length > 0) {
             player.sendMessage(phrase("nameInUse", name));
             return;
         }
-        //Sort coordinates
+
         if (p1.getX() > p2.getX()) {
-            //Swap
+
             double x = p1.getX();
             p1.setX(p2.getX());
             p2.setX(x);
@@ -154,7 +164,11 @@ public class MineCommands {
             p1.setZ(p2.getZ());
             p2.setZ(z);
         }
-        //Create!
+        if (p1.getBlockY() < world.getMinHeight() || p2.getBlockY() >= world.getMaxHeight() - 2) {
+            player.sendMessage("The mine must fit within the world's build height, leaving two blocks above it for teleportation.");
+            return;
+        }
+
         Mine newMine = new Mine(p1.getBlockX(), p1.getBlockY(), p1.getBlockZ(), p2.getBlockX(), p2.getBlockY(), p2.getBlockZ(), name, world);
         plugin.mines.add(newMine);
         player.sendMessage(phrase("mineCreated", newMine));
@@ -177,16 +191,12 @@ public class MineCommands {
         }
         sender.sendMessage(phrase("mineInfoName", mines[0]));
         sender.sendMessage(phrase("mineInfoWorld", mines[0].getWorld()));
-        //Build composition list
+
         StringBuilder csb = new StringBuilder();
         for (Map.Entry<SerializableBlock, Double> entry : mines[0].getComposition().entrySet()) {
             csb.append(entry.getValue() * 100);
             csb.append("% ");
-            csb.append(Material.getMaterial(entry.getKey().getBlockId()).toString());
-            if (entry.getKey().getData() != 0) {
-                csb.append(":");
-                csb.append(entry.getKey().getData());
-            }
+            csb.append(entry.getKey());
             csb.append(", ");
         }
         if (csb.length() > 2) {
@@ -214,7 +224,7 @@ public class MineCommands {
             help = {"This command will always overwrite the current percentage for the specified block,",
                     "if a percentage has already been set. You cannot set the percentage of any specific",
                     "block, such that the percentage would then total over 100%."},
-            usage = "<mine name> <block>:(data) <percentage>%",
+            usage = "<mine name> <material-or-block-state> <percentage>%",
             permissions = {"mineresetlite.mine.composition"},
             min = 3, max = -1, onlyPlayers = false)
     public void setComposition(CommandSender sender, String[] args) {
@@ -226,27 +236,15 @@ public class MineCommands {
             sender.sendMessage(phrase("noMinesMatched"));
             return;
         }
-        //Match material
-        String[] bits = args[args.length - 2].split(":");
-        Material m = plugin.matchMaterial(bits[0]);
-        if (m == null) {
+
+        SerializableBlock parsedBlock;
+        try {
+            parsedBlock = new SerializableBlock(args[args.length - 2]);
+        } catch (IllegalArgumentException ex) {
             sender.sendMessage(phrase("unknownBlock"));
             return;
         }
-        if (!m.isBlock()) {
-            sender.sendMessage(phrase("notABlock"));
-            return;
-        }
-        byte data = 0;
-        if (bits.length == 2) {
-            try {
-                data = Byte.valueOf(bits[1]);
-            } catch (NumberFormatException nfe) {
-                sender.sendMessage(phrase("unknownBlock"));
-                return;
-            }
-        }
-        //Parse percentage
+
         String percentageS = args[args.length - 1];
         if (!percentageS.endsWith("%")) {
             sender.sendMessage(phrase("badPercentage"));
@@ -261,12 +259,12 @@ public class MineCommands {
             sender.sendMessage(phrase("badPercentage"));
             return;
         }
-        if (percentage > 100 || percentage <= 0) {
+        if (!Double.isFinite(percentage) || percentage > 100 || percentage <= 0) {
             sender.sendMessage(phrase("badPercentage"));
             return;
         }
-        percentage = percentage / 100; //Make it a programmatic percentage
-        SerializableBlock block = new SerializableBlock(m.getId(), data);
+        percentage = percentage / 100;
+        SerializableBlock block = parsedBlock;
         Double oldPercentage = mines[0].getComposition().get(block);
         double total = 0;
         for (Map.Entry<SerializableBlock, Double> entry : mines[0].getComposition().entrySet()) {
@@ -293,7 +291,7 @@ public class MineCommands {
 
     @Command(aliases = {"unset", "remove", "-"},
             description = "Remove a block from the composition of a mine",
-            usage = "<mine name> <block>:(data)",
+            usage = "<mine name> <material-or-block-state>",
             permissions = {"mineresetlite.mine.composition"},
             min = 2, max = -1, onlyPlayers = false)
     public void unsetComposition(CommandSender sender, String[] args) {
@@ -305,31 +303,20 @@ public class MineCommands {
             sender.sendMessage(phrase("noMinesMatched"));
             return;
         }
-        //Match material
-        String[] bits = args[args.length - 1].split(":");
-        Material m = plugin.matchMaterial(bits[0]);
-        if (m == null) {
+
+        SerializableBlock parsedBlock;
+        try {
+            parsedBlock = new SerializableBlock(args[args.length - 1]);
+        } catch (IllegalArgumentException ex) {
             sender.sendMessage(phrase("unknownBlock"));
             return;
         }
-        if (!m.isBlock()) {
-            sender.sendMessage(phrase("notABlock"));
-            return;
-        }
-        byte data = 0;
-        if (bits.length == 2) {
-            try {
-                data = Byte.valueOf(bits[1]);
-            } catch (NumberFormatException nfe) {
-                sender.sendMessage(phrase("unknownBlock"));
-                return;
-            }
-        }
-        //Does the mine contain this block?
-        SerializableBlock block = new SerializableBlock(m.getId(), data);
+
+        SerializableBlock block = parsedBlock;
         for (Map.Entry<SerializableBlock, Double> entry : mines[0].getComposition().entrySet()) {
             if (entry.getKey().equals(block)) {
                 mines[0].getComposition().remove(entry.getKey());
+                plugin.buffSave();
                 sender.sendMessage(phrase("blockRemovedFromMine", mines[0], block, (1 - mines[0].getCompositionTotal()) * 100));
                 return;
             }
@@ -357,7 +344,7 @@ public class MineCommands {
             return;
         }
         if (args[args.length - 1].equalsIgnoreCase("-s")) {
-            //Silent reset
+
             mines[0].reset();
         } else {
             MineResetLite.broadcast(phrase("mineResetBroadcast", mines[0], sender), mines[0]);
@@ -420,7 +407,7 @@ public class MineCommands {
                     return;
                 }
             }
-            //Validate warnings
+
             for (Integer warning : warnings) {
                 if (warning >= mines[0].getResetDelay()) {
                     sender.sendMessage(phrase("badWarningList"));
@@ -441,39 +428,28 @@ public class MineCommands {
             plugin.buffSave();
             return;
         } else if (setting.equalsIgnoreCase("surface")) {
-            //Match material
-            String[] bits = value.split(":");
-            Material m = plugin.matchMaterial(bits[0]);
-            if (m == null) {
+
+            SerializableBlock parsedBlock;
+            try {
+                parsedBlock = new SerializableBlock(value);
+            } catch (IllegalArgumentException ex) {
                 sender.sendMessage(phrase("unknownBlock"));
                 return;
             }
-            if (!m.isBlock()) {
-                sender.sendMessage(phrase("notABlock"));
-                return;
-            }
-            byte data = 0;
-            if (bits.length == 2) {
-                try {
-                    data = Byte.valueOf(bits[1]);
-                } catch (NumberFormatException nfe) {
-                    sender.sendMessage(phrase("unknownBlock"));
-                    return;
-                }
-            }
+            Material m = parsedBlock.getMaterial();
             if (m.equals(Material.AIR)) {
                 mines[0].setSurface(null);
                 sender.sendMessage(phrase("surfaceBlockCleared", mines[0]));
                 plugin.buffSave();
                 return;
             }
-            SerializableBlock block = new SerializableBlock(m.getId(), data);
+            SerializableBlock block = parsedBlock;
             mines[0].setSurface(block);
             sender.sendMessage(phrase("surfaceBlockSet", mines[0]));
             plugin.buffSave();
             return;
         } else if (setting.equalsIgnoreCase("fill") || setting.equalsIgnoreCase("fillMode")) {
-            //Match true or false
+
             if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes") || value.equalsIgnoreCase("enabled")) {
                 mines[0].setFillMode(true);
                 sender.sendMessage(phrase("fillModeEnabled"));

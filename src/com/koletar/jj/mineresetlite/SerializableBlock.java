@@ -1,48 +1,34 @@
 package com.koletar.jj.mineresetlite;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.BlockData;
 
-/**
- * @author jjkoletar
- */
-public class SerializableBlock {
-    private int blockId;
-    private byte data;
-
-    public SerializableBlock(int blockId) {
-        this.blockId = blockId;
-        data = 0;
-    }
-
-    public SerializableBlock(int blockId, byte data) {
-        this.blockId = blockId;
-        this.data = data;
-    }
-
-    public SerializableBlock(String self) {
-        String[] bits = self.split(":");
-        if (bits.length != 2) {
-            throw new IllegalArgumentException("String form of SerializableBlock didn't have exactly 2 numbers");
+public final class SerializableBlock {
+    private static final java.util.regex.Pattern LEGACY_MATERIAL =
+            java.util.regex.Pattern.compile("^([A-Za-z_][A-Za-z0-9_]*):(-?\\d+)$");
+    private final BlockData data;
+    private final String state;
+    public SerializableBlock(String specification) {
+        if (specification.matches("\\d+(:\\d+)?")) {
+            throw new IllegalArgumentException("Migrate legacy numeric block IDs to material names: " + specification);
         }
-        try {
-            blockId = Integer.valueOf(bits[0]);
-            data = Byte.valueOf(bits[1]);
-        } catch (NumberFormatException nfe) {
-            throw new IllegalArgumentException("Unable to convert id to integer and data to byte");
+        java.util.regex.Matcher legacy = LEGACY_MATERIAL.matcher(specification);
+        if (legacy.matches()) {
+            if (!legacy.group(2).equals("0")) {
+                throw new IllegalArgumentException("Unsupported legacy block data; convert to a modern material name: " + specification);
+            }
+            specification = legacy.group(1);
         }
+        data = Bukkit.createBlockData(specification.toLowerCase(java.util.Locale.ROOT));
+        state = data.getAsString();
     }
-
-    public int getBlockId() {
-        return blockId;
+    public SerializableBlock(Material material) { this(material.getKey().toString()); }
+    public Material getMaterial() { return data.getMaterial(); }
+    public void apply(Block block) { block.setBlockData(data, false); }
+    @Override public String toString() { return state; }
+    @Override public boolean equals(Object other) {
+        return other instanceof SerializableBlock && state.equals(((SerializableBlock) other).state);
     }
-
-    public byte getData() {
-        return data;
-    }
-
-    public String toString() {
-        return blockId + ":" + data;
-    }
-
-    public boolean equals(Object o) {
-        return o instanceof SerializableBlock && (this.blockId == ((SerializableBlock) o).blockId && this.data == ((SerializableBlock) o).data);
-    }
+    @Override public int hashCode() { return state.hashCode(); }
 }

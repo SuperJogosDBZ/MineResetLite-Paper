@@ -1,6 +1,5 @@
 package com.koletar.jj.mineresetlite;
 
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.ConsoleCommandSender;
@@ -11,9 +10,6 @@ import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.logging.Logger;
 
-/**
- * @author jjkoletar
- */
 public class Phrases {
     private static Phrases instance;
     private ResourceBundle phrases;
@@ -37,9 +33,6 @@ public class Phrases {
     }
 
     public static String phrase(String key, Object... replacements) {
-        if (getInstance() == null) {
-            return "";
-        }
         if (getInstance().phrases == null) {
             return "\u00A74Phrase Error! Did you /reload? Don't!";
         }
@@ -68,7 +61,7 @@ public class Phrases {
         } else if (o instanceof World) {
             return ((World) o).getName();
         } else if (o instanceof SerializableBlock) {
-            return Material.getMaterial(((SerializableBlock) o).getBlockId()).toString() + (((SerializableBlock) o).getData() != 0 ? ":" + ((SerializableBlock) o).getData() : "");
+            return o.toString();
         } else if (o instanceof ConsoleCommandSender) {
             return phrase("console");
         } else if (o instanceof BlockCommandSender) {

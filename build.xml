@@ -1,22 +1,11 @@
 <project name="MineResetLite" default="build">
-    <property name="build.version" value="dev-unversioned"/>
+    <condition property="maven.executable" value="mvn.cmd" else="mvn">
+        <os family="windows"/>
+    </condition>
     <target name="build">
-        <mkdir dir="build"/>
-        <javac srcdir="src" destdir="build" debug="on">
-            <classpath>
-                <fileset dir="lib">
-                    <include name="*.jar"/>
-                </fileset>
-            </classpath>
-        </javac>
-        <copy todir="build">
-            <fileset dir="src">
-                <include name="*.yml"/>
-                <include name="**/*.properties"/>
-            </fileset>
-        </copy>
-        <replace file="build/plugin.yml" token="$version$" value="${build.version}"/>
-        <jar jarfile="MineResetLite.jar" basedir="build"/>
-        <delete dir="build"/>
+        <exec executable="${maven.executable}" failonerror="true">
+            <arg value="clean"/>
+            <arg value="verify"/>
+        </exec>
     </target>
 </project>

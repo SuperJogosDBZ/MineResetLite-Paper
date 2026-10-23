@@ -14,9 +14,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.logging.Logger;
 
-/**
- * @author jjkoletar
- */
 public class Mine implements ConfigurationSerializable {
     private int minX;
     private int minY;
@@ -77,7 +74,7 @@ public class Mine implements ConfigurationSerializable {
                 composition.put(new SerializableBlock(entry.getKey()), entry.getValue());
             }
         } catch (Throwable t) {
-            throw new IllegalArgumentException("Error deserializing composition");
+            throw new IllegalArgumentException("Error deserializing composition; migrate legacy IDs to modern material names", t);
         }
         name = (String) me.get("name");
         resetDelay = (Integer) me.get("resetDelay");
@@ -101,7 +98,7 @@ public class Mine implements ConfigurationSerializable {
         if (me.containsKey("resetClock")) {
             resetClock = (Integer) me.get("resetClock");
         }
-        //Compat for the clock
+
         if (resetDelay > 0 && resetClock == 0) {
             resetClock = resetDelay;
         }
@@ -119,7 +116,7 @@ public class Mine implements ConfigurationSerializable {
         me.put("maxY", maxY);
         me.put("maxZ", maxZ);
         me.put("world", world.getName());
-        //Make string form of composition
+
         Map<String, Double> sComposition = new HashMap<String, Double>();
         for (Map.Entry<SerializableBlock, Double> entry : composition.entrySet()) {
             sComposition.put(entry.getKey().toString(), entry.getValue());
@@ -168,12 +165,6 @@ public class Mine implements ConfigurationSerializable {
         return resetDelay;
     }
 
-    /**
-     * Return the length of time until the next automatic reset.
-     * The actual length of time is anywhere between n and n-1 minutes.
-     *
-     * @return clock ticks left until reset
-     */
     public int getTimeUntilReset() {
         return resetClock;
     }
@@ -215,37 +206,52 @@ public class Mine implements ConfigurationSerializable {
     }
 
     public boolean isInside(Player p) {
-        Location l = p.getLocation();
+        return isInside(p.getLocation());
+    }
+
+    public boolean isInside(Location l) {
         return l.getWorld().equals(world)
-            && (l.getX() >= minX && l.getX() <= maxX)
-            && (l.getY() >= minY && l.getY() <= maxY)
-            && (l.getZ() >= minZ && l.getZ() <= maxZ);
+            && (l.getBlockX() >= minX && l.getBlockX() <= maxX)
+            && (l.getBlockY() >= minY && l.getBlockY() <= maxY)
+            && (l.getBlockZ() >= minZ && l.getBlockZ() <= maxZ);
     }
 
     public void reset() {
-        //Get probability map
-        List<CompositionEntry> probabilityMap = mapComposition(composition);
-        //Pull players out
-        for (Player p : Bukkit.getServer().getOnlinePlayers()) {
+
+        SerializableBlock singleBlock = null;
+        if (composition.size() == 1) {
+            Map.Entry<SerializableBlock, Double> entry = composition.entrySet().iterator().next();
+            if (entry.getValue() == 1.0) {
+                singleBlock = entry.getKey();
+            }
+        }
+        List<CompositionEntry> probabilityMap = singleBlock == null ? mapComposition(composition) : null;
+
+        for (Player p : world.getPlayers()) {
             Location l = p.getLocation();
-            if (isInside(p)) {
+            if (isInside(l)) {
                 p.teleport(new Location(world, l.getX(), maxY + 2D, l.getZ()));
             }
         }
-        //Actually reset
-        Random rand = new Random();
+
+        Random rand = singleBlock == null ? new Random() : null;
         for (int x = minX; x <= maxX; ++x) {
             for (int y = minY; y <= maxY; ++y) {
                 for (int z = minZ; z <= maxZ; ++z) {
-                    if (!fillMode || world.getBlockTypeIdAt(x, y, z) == 0) {
+                    org.bukkit.block.Block block = world.getBlockAt(x, y, z);
+                    if (!fillMode || block.getType().isAir()) {
                         if (y == maxY && surface != null) {
-                            world.getBlockAt(x, y, z).setTypeIdAndData(surface.getBlockId(), surface.getData(), false);
+                            surface.apply(block);
+                            continue;
+                        }
+                        if (singleBlock != null) {
+                            singleBlock.apply(block);
                             continue;
                         }
                         double r = rand.nextDouble();
                         for (CompositionEntry ce : probabilityMap) {
                             if (r <= ce.getChance()) {
-                                world.getBlockAt(x, y, z).setTypeIdAndData(ce.getBlock().getBlockId(), ce.getBlock().getData(), false);
+                                ce.getBlock().apply(block);
                                 break;
                             }
                         }
@@ -260,7 +266,7 @@ public class Mine implements ConfigurationSerializable {
             return;
         }
         if (resetClock > 0) {
-            resetClock--; //Tick down to the reset
+            resetClock--;
         }
         if (resetClock == 0) {
             if (!isSilent) {
@@ -302,9 +308,9 @@ public class Mine implements ConfigurationSerializable {
         for (Map.Entry<SerializableBlock, Double> entry : composition.entrySet()) {
             max += entry.getValue();
         }
-        //Pad the remaining percentages with air
+
         if (max < 1) {
-            composition.put(new SerializableBlock(0), 1 - max);
+            composition.put(new SerializableBlock(org.bukkit.Material.AIR), 1 - max);
             max = 1;
         }
         double i = 0;

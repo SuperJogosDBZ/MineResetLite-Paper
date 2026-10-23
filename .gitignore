@@ -1,10 +1,12 @@
 *.class
 
-# Package Files #
 MineResetLite.jar
 *.war
 *.ear
 
-# IntelliJ Stuff #
 .idea
 *.iml
+
+target/
+.tooling/
+.validation/
