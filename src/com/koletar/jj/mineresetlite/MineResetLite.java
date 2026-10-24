@@ -116,7 +116,10 @@ public class MineResetLite extends JavaPlugin {
     public Mine[] matchMines(String in) {
         List<Mine> matches = new LinkedList<Mine>();
         for (Mine mine : mines) {
-            if (mine.getName().toLowerCase().contains(in.toLowerCase())) {
+            if (mine.getName().equalsIgnoreCase(in)) {
+                return new Mine[] { mine };
+            }
+            if (mine.getName().toLowerCase(Locale.ROOT).contains(in.toLowerCase(Locale.ROOT))) {
                 matches.add(mine);
             }
         }
