@@ -15,7 +15,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitScheduler;
 
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -56,14 +58,14 @@ public class MineResetLite extends JavaPlugin {
         commandManager.register(MineCommands.class, new MineCommands(this));
         commandManager.register(CommandManager.class, commandManager);
         commandManager.register(PluginCommands.class, new PluginCommands(this));
-        Locale locale = new Locale(Config.getLocale());
+        Locale locale = Locale.forLanguageTag(Config.getLocale().replace('_', '-'));
         Phrases.getInstance().initialize(locale);
         File overrides = new File(getDataFolder(), "phrases.properties");
         if (overrides.exists()) {
             Properties overridesProps = new Properties();
             try {
-                try (FileInputStream stream = new FileInputStream(overrides)) {
-                    overridesProps.load(stream);
+                try (Reader reader = Files.newBufferedReader(overrides.toPath(), StandardCharsets.UTF_8)) {
+                    overridesProps.load(reader);
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -101,7 +103,7 @@ public class MineResetLite extends JavaPlugin {
                     mine.cron();
                 }
             }
-        }, 60 * 20L, 60 * 20L);
+        }, 20L, 20L);
         logger.info("MineResetLite version " + getDescription().getVersion() + " enabled!");
     }
 

@@ -14,9 +14,9 @@ public class PluginCommands {
     }
 
     @Command(aliases = {"about"},
-            description = "List version and project information about MRL",
+            description = "command.about.description",
+            help = {"command.about.help.0"},
             permissions = {},
-            help = {"Show version information about this installation of MRL, in addition", "to the authors of the plugin."},
             min = 0, max = 0, onlyPlayers = false)
     public void about(CommandSender sender, String[] args) {
         sender.sendMessage(phrase("aboutTitle"));

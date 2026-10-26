@@ -28,7 +28,7 @@ public class Mine implements ConfigurationSerializable {
     private String name;
     private SerializableBlock surface;
     private boolean fillMode;
-    private int resetClock;
+    private long resetClockSeconds;
     private boolean isSilent;
 
     public Mine(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, String name, World world) {
@@ -95,12 +95,14 @@ public class Mine implements ConfigurationSerializable {
         if (me.containsKey("fillMode")) {
             fillMode = (Boolean) me.get("fillMode");
         }
-        if (me.containsKey("resetClock")) {
-            resetClock = (Integer) me.get("resetClock");
+        if (me.containsKey("resetClockSeconds")) {
+            resetClockSeconds = ((Number) me.get("resetClockSeconds")).longValue();
+        } else if (me.containsKey("resetClock")) {
+            resetClockSeconds = ((Number) me.get("resetClock")).longValue() * 60L;
         }
 
-        if (resetDelay > 0 && resetClock == 0) {
-            resetClock = resetDelay;
+        if (resetDelay > 0 && resetClockSeconds == 0) {
+            resetClockSeconds = resetDelay * 60L;
         }
         if (me.containsKey("isSilent")) {
             isSilent = (Boolean) me.get("isSilent");
@@ -135,7 +137,8 @@ public class Mine implements ConfigurationSerializable {
             me.put("surface", "");
         }
         me.put("fillMode", fillMode);
-        me.put("resetClock", resetClock);
+        me.put("resetClock", getTimeUntilReset());
+        me.put("resetClockSeconds", resetClockSeconds);
         me.put("isSilent", isSilent);
         return me;
     }
@@ -150,7 +153,7 @@ public class Mine implements ConfigurationSerializable {
 
     public void setResetDelay(int minutes) {
         resetDelay = minutes;
-        resetClock = minutes;
+        resetClockSeconds = minutes * 60L;
     }
 
     public void setResetWarnings(List<Integer> warnings) {
@@ -166,7 +169,14 @@ public class Mine implements ConfigurationSerializable {
     }
 
     public int getTimeUntilReset() {
-        return resetClock;
+        return (int) ((resetClockSeconds + 59) / 60);
+    }
+
+    public void setTimeUntilResetSeconds(long seconds) {
+        if (seconds <= 0 || seconds > resetDelay * 60L) {
+            throw new IllegalArgumentException("Next reset must be within the mine's reset interval");
+        }
+        resetClockSeconds = seconds;
     }
 
     public SerializableBlock getSurface() {
@@ -265,19 +275,19 @@ public class Mine implements ConfigurationSerializable {
         if (resetDelay == 0) {
             return;
         }
-        if (resetClock > 0) {
-            resetClock--;
+        if (resetClockSeconds > 0) {
+            resetClockSeconds--;
         }
-        if (resetClock == 0) {
+        if (resetClockSeconds == 0) {
             if (!isSilent) {
                 MineResetLite.broadcast(Phrases.phrase("mineAutoResetBroadcast", this), this);
             }
             reset();
-            resetClock = resetDelay;
+            resetClockSeconds = resetDelay * 60L;
             return;
         }
         for (Integer warning : resetWarnings) {
-            if (warning == resetClock) {
+            if (warning * 60L == resetClockSeconds) {
                 MineResetLite.broadcast(Phrases.phrase("mineWarningBroadcast", this, warning), this);
             }
         }

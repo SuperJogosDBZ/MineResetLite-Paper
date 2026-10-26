@@ -38,16 +38,18 @@ public class CommandManager {
     }
 
     @Command(aliases = {"help", "?"},
-            description = "Provide information about MineResetLite commands",
+            description = "command.help.description",
+            help = {"command.help.help.0"},
+            usage = "command.help.usage",
             min = 0, max = -1)
     public void help(CommandSender sender, String[] args) {
         if (args.length >= 1) {
 
             if (commands.containsKey(args[0].toLowerCase())) {
                 Command command = commands.get(args[0].toLowerCase()).getAnnotation(Command.class);
-                sender.sendMessage(phrase("helpUsage", command.aliases()[0], command.usage()));
+                sender.sendMessage(phrase("helpUsage", command.aliases()[0], usage(command)));
                 for (String help : command.help()) {
-                    sender.sendMessage(ChatColor.GRAY + help);
+                    sender.sendMessage(ChatColor.GRAY + phrase(help));
                 }
                 return;
             }
@@ -61,7 +63,7 @@ public class CommandManager {
                 if ((command.onlyPlayers() && !(sender instanceof Player))) {
                     continue;
                 }
-                boolean may = false;
+                boolean may = command.permissions().length == 0;
                 for (String perm : command.permissions()) {
                     if (sender.hasPermission(perm)) {
                         may = true;
@@ -70,11 +72,15 @@ public class CommandManager {
                 if (!may) {
                     continue;
                 }
-                sender.sendMessage(phrase("helpUsage", command.aliases()[0], command.usage()));
-                sender.sendMessage(phrase("helpDesc", command.description()));
+                sender.sendMessage(phrase("helpUsage", command.aliases()[0], usage(command)));
+                sender.sendMessage(phrase("helpDesc", phrase(command.description())));
             }
         }
 
+    }
+
+    private String usage(Command command) {
+        return command.usage().isEmpty() ? "" : phrase(command.usage());
     }
 
     public void callCommand(String cmdName, CommandSender sender, String[] args) {
@@ -89,7 +95,7 @@ public class CommandManager {
 
         if (!(command.min() <= args.length && (command.max() == -1 || command.max() >= args.length))) {
             sender.sendMessage(phrase("invalidArguments"));
-            sender.sendMessage(phrase("invalidArgsUsage", command.aliases()[0], command.usage()));
+            sender.sendMessage(phrase("invalidArgsUsage", command.aliases()[0], usage(command)));
             return;
         }
 
@@ -98,10 +104,7 @@ public class CommandManager {
             return;
         }
 
-        boolean may = false;
-        if (command.permissions().length == 0) {
-            may = true;
-        }
+        boolean may = command.permissions().length == 0;
         for (String perm : command.permissions()) {
             if (sender.hasPermission(perm)) {
                 may = true;
@@ -121,7 +124,7 @@ public class CommandManager {
         } catch (InvocationTargetException e) {
             if (e.getCause() instanceof InvalidCommandArgumentsException) {
                 sender.sendMessage(phrase("invalidArguments"));
-                sender.sendMessage(phrase("invalidArgsUsage", command.aliases()[0], command.usage()));
+                sender.sendMessage(phrase("invalidArgsUsage", command.aliases()[0], usage(command)));
             } else {
                 e.printStackTrace();
                 throw new RuntimeException("Invalid methods on command!");

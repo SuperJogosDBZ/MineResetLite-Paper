@@ -34,19 +34,18 @@ public class MineCommands {
     }
 
     @Command(aliases = {"list", "l"},
-            description = "List the names of all Mines",
+            description = "command.list.description",
+            help = {"command.list.help.0"},
             permissions = {"mineresetlite.mine.list"},
-            help = {"List the names of all Mines currently created, across all worlds."},
             min = 0, max = 0, onlyPlayers = false)
     public void listMines(CommandSender sender, String[] args) {
         sender.sendMessage(phrase("mineList", StringTools.buildList(plugin.mines, "&c", "&d, ")));
     }
 
     @Command(aliases = {"pos1", "p1"},
-            description = "Change your first selection point",
-            help = {"Run this command to set your first selection point to the block you are looking at.",
-                    "Use /mrl pos1 -feet to set your first point to the location you are standing on."},
-            usage = "(-feet)",
+            description = "command.pos1.description",
+            help = {"command.pos1.help.0"},
+            usage = "command.pos1.usage",
             permissions = {"mineresetlite.mine.create", "mineresetlite.mine.redefine"},
             min = 0, max = 1, onlyPlayers = true)
     public void setPoint1(CommandSender sender, String[] args) throws InvalidCommandArgumentsException {
@@ -72,10 +71,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"pos2", "p2"},
-            description = "Change your first selection point",
-            help = {"Run this command to set your second selection point to the block you are looking at.",
-                    "Use /mrl pos2 -feet to set your second point to the location you are standing on."},
-            usage = "(-feet)",
+            description = "command.pos2.description",
+            help = {"command.pos2.help.0"},
+            usage = "command.pos2.usage",
             permissions = {"mineresetlite.mine.create", "mineresetlite.mine.redefine"},
             min = 0, max = 1, onlyPlayers = true)
     public void setPoint2(CommandSender sender, String[] args) throws InvalidCommandArgumentsException {
@@ -101,10 +99,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"create", "save"},
-            description = "Create a mine from either your WorldEdit selection or by manually specifying the points",
-            help = {"Provided you have a selection made via either WorldEdit or selecting the points using MRL,",
-                    "an empty mine will be created. This mine will have no composition and default settings."},
-            usage = "<mine name>",
+            description = "command.create.description",
+            help = {"command.create.help.0"},
+            usage = "command.create.usage",
             permissions = {"mineresetlite.mine.create"},
             min = 1, max = -1, onlyPlayers = true)
     public void createMine(CommandSender sender, String[] args) {
@@ -165,7 +162,7 @@ public class MineCommands {
             p2.setZ(z);
         }
         if (p1.getBlockY() < world.getMinHeight() || p2.getBlockY() >= world.getMaxHeight() - 2) {
-            player.sendMessage("The mine must fit within the world's build height, leaving two blocks above it for teleportation.");
+            player.sendMessage(phrase("mineHeightInvalid"));
             return;
         }
 
@@ -176,8 +173,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"info", "i"},
-            description = "List information about a mine",
-            usage = "<mine name>",
+            description = "command.info.description",
+            help = {"command.info.help.0"},
+            usage = "command.info.usage",
             permissions = {"mineresetlite.mine.info"},
             min = 1, max = -1, onlyPlayers = false)
     public void mineInfo(CommandSender sender, String[] args) {
@@ -220,11 +218,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"set", "add", "+"},
-            description = "Set the percentage of a block in the mine",
-            help = {"This command will always overwrite the current percentage for the specified block,",
-                    "if a percentage has already been set. You cannot set the percentage of any specific",
-                    "block, such that the percentage would then total over 100%."},
-            usage = "<mine name> <material-or-block-state> <percentage>%",
+            description = "command.set.description",
+            help = {"command.set.help.0"},
+            usage = "command.set.usage",
             permissions = {"mineresetlite.mine.composition"},
             min = 3, max = -1, onlyPlayers = false)
     public void setComposition(CommandSender sender, String[] args) {
@@ -290,8 +286,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"unset", "remove", "-"},
-            description = "Remove a block from the composition of a mine",
-            usage = "<mine name> <material-or-block-state>",
+            description = "command.unset.description",
+            help = {"command.unset.help.0"},
+            usage = "command.unset.usage",
             permissions = {"mineresetlite.mine.composition"},
             min = 2, max = -1, onlyPlayers = false)
     public void unsetComposition(CommandSender sender, String[] args) {
@@ -326,12 +323,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"reset", "r"},
-            description = "Reset a mine",
-            help = {"If you supply the -s argument, the mine will silently reset. Resets triggered via",
-                    "this command will not show a 1 minute warning, unless this mine is flagged to always",
-                    "have a warning. If the mine's composition doesn't equal 100%, the composition will be",
-                    "padded with air until the total equals 100%."},
-            usage = "<mine name> (-s)",
+            description = "command.reset.description",
+            help = {"command.reset.help.0"},
+            usage = "command.reset.usage",
             permissions = {"mineresetlite.mine.reset"},
             min = 1, max = -1, onlyPlayers = false)
     public void resetMine(CommandSender sender, String[] args) {
@@ -353,14 +347,9 @@ public class MineCommands {
     }
 
     @Command(aliases = {"flag", "f"},
-            description = "Set various properties of a mine, including automatic resets",
-            help = {"Available flags:",
-                    "resetDelay: An integer number of minutes specifying the time between automatic resets. Set to 0 to disable automatic resets.",
-                    "resetWarnings: A comma separated list of integer minutes to warn before the automatic reset. Warnings must be less than the reset delay.",
-                    "surface: A block that will cover the entire top surface of the mine when reset, obscuring surface ores. Set surface to air to clear the value.",
-                    "fillMode: An alternate reset algorithm that will only \"reset\" air blocks inside your mine. Set to true or false.",
-                    "isSilent: A boolean (true or false) of whether or not this mine should broadcast a reset notification when it is reset *automatically*"},
-            usage = "<mine name> <setting> <value>",
+            description = "command.flag.description",
+            help = {"command.flag.help.0", "command.flag.help.1", "command.flag.help.2", "command.flag.help.3", "command.flag.help.4", "command.flag.help.5"},
+            usage = "command.flag.usage",
             permissions = {"mineresetlite.mine.flag"},
             min = 3, max = -1, onlyPlayers = false)
     public void flag(CommandSender sender, String[] args) {
@@ -479,9 +468,9 @@ public class MineCommands {
         sender.sendMessage(phrase("unknownFlag"));
     }
     @Command(aliases = {"erase"},
-            description = "Completely erase a mine",
-            help = {"Like most erasures of data, be sure you don't need to recover anything from this mine before you delete it."},
-            usage = "<mine name>",
+            description = "command.erase.description",
+            help = {"command.erase.help.0"},
+            usage = "command.erase.usage",
             permissions = {"mineresetlite.mine.erase"},
             min = 1, max = -1, onlyPlayers = false)
     public void erase(CommandSender sender, String[] args) {
@@ -496,9 +485,46 @@ public class MineCommands {
         plugin.eraseMine(mines[0]);
         sender.sendMessage(phrase("mineErased", mines[0]));
     }
+    @Command(aliases = {"stagger"},
+            description = "command.stagger.description",
+            help = {"command.stagger.help.0"},
+            usage = "command.stagger.usage",
+            permissions = {"mineresetlite.mine.flag"},
+            min = 2, max = 2, onlyPlayers = false)
+    public void stagger(CommandSender sender, String[] args) {
+        int spacing;
+        int interval;
+        try {
+            spacing = Integer.parseInt(args[0]);
+            interval = Integer.parseInt(args[1]);
+        } catch (NumberFormatException ex) {
+            sender.sendMessage(phrase("badStagger"));
+            return;
+        }
+        long duration = interval * 60L;
+        if (spacing <= 0 || interval <= 0 || spacing > duration) {
+            sender.sendMessage(phrase("badStagger"));
+            return;
+        }
+        long slots = duration / spacing;
+        int count = 0;
+        for (Mine mine : plugin.mines) {
+            if (mine.getResetDelay() == interval) {
+                mine.setTimeUntilResetSeconds((count % slots + 1) * spacing);
+                count++;
+            }
+        }
+        if (count == 0) {
+            sender.sendMessage(phrase("noStaggerMines", interval));
+            return;
+        }
+        plugin.buffSave();
+        sender.sendMessage(phrase("minesStaggered", count, interval, spacing));
+    }
+
     @Command(aliases = {"reschedule"},
-            description = "Synchronize all automatic mine resets",
-            help = {"This command will set the 'start time' of the mine resets to the same point."},
+            description = "command.reschedule.description",
+            help = {"command.reschedule.help.0"},
             usage = "",
             permissions = {"mineresetlite.mine.flag"},
             min = 0, max = 0, onlyPlayers = false)

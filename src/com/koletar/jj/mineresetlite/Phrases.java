@@ -25,7 +25,8 @@ public class Phrases {
     }
 
     public void initialize(Locale l) {
-        phrases = ResourceBundle.getBundle("phrases", l);
+        phrases = ResourceBundle.getBundle("phrases", l,
+                ResourceBundle.Control.getNoFallbackControl(ResourceBundle.Control.FORMAT_DEFAULT));
     }
 
     public void overrides(Properties overrides) {
@@ -54,7 +55,9 @@ public class Phrases {
     }
 
     public static String findName(Object o) {
-        if (o instanceof Mine) {
+        if (o instanceof Boolean) {
+            return phrase((Boolean) o ? "booleanTrue" : "booleanFalse");
+        } else if (o instanceof Mine) {
             return ((Mine) o).getName();
         } else if (o instanceof Player) {
             return ((Player) o).getName();

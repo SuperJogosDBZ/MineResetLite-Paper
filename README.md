@@ -6,6 +6,8 @@ Changes compared with the original [jjkoletar/MineResetLite](https://github.com/
 - Modernized block handling and added support for reading TeamVK composition and surface entries such as `STONE:0`.
 - Fixed saving after removing composition entries and corrected delayed-save task handling.
 - Optimized resets for a single block at 100%, reused block lookups, and limited player checks to the mine's world.
+- Added `/mrl stagger <spacing seconds> <interval minutes>` to distribute resets for matching mines; extra mines share time slots, and other intervals stay unchanged.
+- Revised messages and command help in all eight bundled languages; custom messages are read as UTF-8.
 - Updated optional WorldEdit/FAWE selection integration.
 - Removed obsolete code, legacy metrics, and the update checker.
 - Validated functionality and persistence on local Paper servers.
