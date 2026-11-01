@@ -12,6 +12,10 @@ import java.util.Map;
 import static com.koletar.jj.mineresetlite.Phrases.phrase;
 
 public class CommandManager {
+    private static final String[] HELP_ORDER = {
+            "pos1", "pos2", "create", "set", "unset", "flag", "reset",
+            "reschedule", "stagger", "info", "list", "erase", "about", "help"
+    };
     private Map<String, Method> commands;
     private Map<Method, Object> instances;
 
@@ -53,8 +57,9 @@ public class CommandManager {
                 return;
             }
         }
-        for (Method method : instances.keySet().stream()
-                .sorted(java.util.Comparator.comparing(m -> m.getAnnotation(Command.class).aliases()[0])).toList()) {
+        for (String name : HELP_ORDER) {
+            Method method = commands.get(name);
+            if (method == null) continue;
             Command command = method.getAnnotation(Command.class);
 
             if ((command.onlyPlayers() && !(sender instanceof Player))) {

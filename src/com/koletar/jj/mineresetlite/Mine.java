@@ -263,9 +263,7 @@ public class Mine implements ConfigurationSerializable {
             Location l = p.getLocation();
             if (isInside(l)) {
                 l.setY(maxY + 1D);
-                if (!p.teleport(l)) {
-                    throw new IllegalStateException("Teleport cancelled for player: " + p.getName());
-                }
+                p.teleport(l);
             }
         }
 

@@ -431,16 +431,16 @@ public class MineCommands implements org.bukkit.event.Listener {
             permissions = {"mineresetlite.mine.erase"},
             min = 1, max = -1, onlyPlayers = false)
     public void erase(CommandSender sender, String[] args) {
-        Mine[] mines = plugin.matchMines(StringTools.buildSpacedArgument(args));
-        if (mines.length > 1) {
-            sender.sendMessage(phrase("tooManyMines"));
-            return;
-        } else if (mines.length == 0) {
-            sender.sendMessage(phrase("noMinesMatched"));
-            return;
+        String name = StringTools.buildSpacedArgument(args);
+        for (Mine mine : plugin.mines) {
+            if (mine.getName().equalsIgnoreCase(name)) {
+                sender.sendMessage(phrase(plugin.eraseMine(mine) ? "mineErased" : "mineEraseFailed", mine));
+                return;
+            }
         }
-        sender.sendMessage(phrase(plugin.eraseMine(mines[0]) ? "mineErased" : "mineEraseFailed", mines[0]));
+        sender.sendMessage(phrase("noMinesMatched"));
     }
+
     @Command(aliases = {"stagger"},
             description = "command.stagger.description",
             help = {"command.stagger.help.0"},
