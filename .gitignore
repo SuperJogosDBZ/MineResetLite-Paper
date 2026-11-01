@@ -1,12 +1,14 @@
 *.class
-
 MineResetLite.jar
 *.war
 *.ear
-
 .idea
 *.iml
-
 target/
 .tooling/
 .validation/
+/target/
+*.log
+hs_err_pid*.log
+replay_pid*.log
+/.runtime-test/

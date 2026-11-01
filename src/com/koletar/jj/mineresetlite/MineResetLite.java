@@ -6,7 +6,6 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.entity.Player;
@@ -21,7 +20,6 @@ import java.nio.file.Files;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
@@ -34,6 +32,8 @@ public class MineResetLite extends JavaPlugin {
     private Plugin worldEdit = null;
     private int saveTaskId = -1;
     private int resetTaskId = -1;
+    private final java.util.Map<Mine, File> mineFiles = new java.util.HashMap<>();
+    private boolean loaded;
 
     static {
         ConfigurationSerialization.registerClass(Mine.class);
@@ -41,7 +41,7 @@ public class MineResetLite extends JavaPlugin {
 
     private static class IsMineFile implements FilenameFilter {
         public boolean accept(File file, String s) {
-            return s.contains(".mine.yml");
+            return s.endsWith(".mine.yml") && new File(file, s).isFile();
         }
     }
 
@@ -61,6 +61,7 @@ public class MineResetLite extends JavaPlugin {
         Locale locale = Locale.forLanguageTag(Config.getLocale().replace('_', '-'));
         Phrases.getInstance().initialize(locale);
         File overrides = new File(getDataFolder(), "phrases.properties");
+        Phrases.getInstance().overrides(null);
         if (overrides.exists()) {
             Properties overridesProps = new Properties();
             try {
@@ -84,8 +85,9 @@ public class MineResetLite extends JavaPlugin {
         if (mineFiles == null) throw new IllegalStateException("Cannot read mines directory");
         for (File file : mineFiles) {
             logger.info("Loading mine from file '" + file.getName() + "'...");
-            FileConfiguration fileConf = YamlConfiguration.loadConfiguration(file);
             try {
+                YamlConfiguration fileConf = new YamlConfiguration();
+                fileConf.load(file);
                 Object o = fileConf.get("mine");
                 if (!(o instanceof Mine)) {
                     logger.severe("Mine wasn't a mine object! Something is off with serialization!");
@@ -93,14 +95,20 @@ public class MineResetLite extends JavaPlugin {
                 }
                 Mine mine = (Mine) o;
                 mines.add(mine);
-            } catch (Throwable t) {
+                this.mineFiles.put(mine, file);
+            } catch (Exception t) {
                 logger.log(java.util.logging.Level.SEVERE, "Unable to load mine: " + file.getName(), t);
             }
         }
+        loaded = true;
         resetTaskId = getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
             public void run() {
                 for (Mine mine : mines) {
-                    mine.cron();
+                    try {
+                        mine.cron();
+                    } catch (RuntimeException ex) {
+                        logger.log(java.util.logging.Level.SEVERE, "Reset failed for mine: " + mine.getName(), ex);
+                    }
                 }
             }
         }, 20L, 20L);
@@ -111,17 +119,19 @@ public class MineResetLite extends JavaPlugin {
         getServer().getScheduler().cancelTask(resetTaskId);
         getServer().getScheduler().cancelTask(saveTaskId);
         HandlerList.unregisterAll(this);
-        save();
+        if (loaded) save();
         logger.info("MineResetLite disabled");
     }
 
     public Mine[] matchMines(String in) {
-        List<Mine> matches = new LinkedList<Mine>();
+        List<Mine> matches = new ArrayList<Mine>();
+        String query = in.toLowerCase(Locale.ROOT);
+        if (query.isBlank()) return new Mine[0];
         for (Mine mine : mines) {
             if (mine.getName().equalsIgnoreCase(in)) {
                 return new Mine[] { mine };
             }
-            if (mine.getName().toLowerCase(Locale.ROOT).contains(in.toLowerCase(Locale.ROOT))) {
+            if (mine.getName().toLowerCase(Locale.ROOT).contains(query)) {
                 matches.add(mine);
             }
         }
@@ -130,10 +140,7 @@ public class MineResetLite extends JavaPlugin {
 
     public void buffSave() {
         BukkitScheduler scheduler = getServer().getScheduler();
-        if (saveTaskId != -1) {
-
-            scheduler.cancelTask(saveTaskId);
-        }
+        if (saveTaskId != -1) return;
 
         final MineResetLite plugin = this;
         saveTaskId = scheduler.scheduleSyncDelayedTask(this, new Runnable() {
@@ -147,24 +154,40 @@ public class MineResetLite extends JavaPlugin {
     public void save() {
         for (Mine mine : mines) {
             File mineFile = getMineFile(mine);
-            FileConfiguration mineConf = YamlConfiguration.loadConfiguration(mineFile);
+            YamlConfiguration mineConf = new YamlConfiguration();
             mineConf.set("mine", mine);
             try {
                 mineConf.save(mineFile);
             } catch (IOException e) {
-                logger.severe("Unable to serialize mine!");
-                e.printStackTrace();
+                logger.log(java.util.logging.Level.SEVERE, "Unable to save mine: " + mine.getName(), e);
             }
         }
     }
 
-    private File getMineFile(Mine mine) {
-        return new File(new File(getDataFolder(), "mines"), mine.getName().replace(" ", "") + ".mine.yml");
+    public boolean isMineNameAvailable(String name) {
+        if (name.isBlank() || name.chars().anyMatch(c -> c < 32 || "<>:\"/\\|?*&".indexOf(c) >= 0)) {
+            return false;
+        }
+        File candidate = new File(new File(getDataFolder(), "mines"), name.replace(" ", "") + ".mine.yml");
+        if (candidate.exists()) return false;
+        return mines.stream().noneMatch(mine -> getMineFile(mine).getName().equalsIgnoreCase(candidate.getName()));
     }
 
-    public void eraseMine(Mine mine) {
+    private File getMineFile(Mine mine) {
+        return mineFiles.computeIfAbsent(mine, key ->
+                new File(new File(getDataFolder(), "mines"), key.getName().replace(" ", "") + ".mine.yml"));
+    }
+
+    public boolean eraseMine(Mine mine) {
+        try {
+            Files.deleteIfExists(getMineFile(mine).toPath());
+        } catch (IOException ex) {
+            logger.log(java.util.logging.Level.SEVERE, "Unable to delete mine: " + mine.getName(), ex);
+            return false;
+        }
         mines.remove(mine);
-        getMineFile(mine).delete();
+        mineFiles.remove(mine);
+        return true;
     }
 
     public boolean hasWorldEdit() {
@@ -217,7 +240,7 @@ public class MineResetLite extends JavaPlugin {
     public static void broadcast(String message, Mine mine) {
         if (Config.getBroadcastNearbyOnly()) {
             for (Player p : mine.getWorld().getPlayers()) {
-                if (mine.isInside(p)) {
+                if (mine.isInside(p.getLocation(), 2)) {
                     p.sendMessage(message);
                 }
             }
@@ -232,3 +255,4 @@ public class MineResetLite extends JavaPlugin {
         }
     }
 }
+

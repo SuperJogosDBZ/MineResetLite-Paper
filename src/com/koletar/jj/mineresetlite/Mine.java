@@ -52,12 +52,12 @@ public class Mine implements ConfigurationSerializable {
             maxX = (Integer) me.get("maxX");
             maxY = (Integer) me.get("maxY");
             maxZ = (Integer) me.get("maxZ");
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             throw new IllegalArgumentException("Error deserializing coordinate pairs");
         }
         try {
             world = Bukkit.getServer().getWorld((String) me.get("world"));
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             throw new IllegalArgumentException("Error finding world");
         }
         if (world == null) {
@@ -68,21 +68,35 @@ public class Mine implements ConfigurationSerializable {
             throw new IllegalArgumentException("World was null!");
         }
         try {
-            Map<String, Double> sComposition = (Map<String, Double>) me.get("composition");
+            Map<String, Number> sComposition = (Map<String, Number>) me.get("composition");
             composition = new HashMap<SerializableBlock, Double>();
-            for (Map.Entry<String, Double> entry : sComposition.entrySet()) {
-                composition.put(new SerializableBlock(entry.getKey()), entry.getValue());
+            for (Map.Entry<String, Number> entry : sComposition.entrySet()) {
+                double chance = entry.getValue().doubleValue();
+                if (!Double.isFinite(chance) || chance <= 0 || chance > 1) {
+                    throw new IllegalArgumentException("Invalid block percentage");
+                }
+                composition.merge(new SerializableBlock(entry.getKey()), chance, Double::sum);
             }
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             throw new IllegalArgumentException("Error deserializing composition; migrate legacy IDs to modern material names", t);
         }
+        if (getCompositionTotal() > 1 + 1e-12) throw new IllegalArgumentException("Composition exceeds 100%");
         name = (String) me.get("name");
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("Missing mine name");
+        if (minX > maxX || minY > maxY || minZ > maxZ
+                || minY < world.getMinHeight() || maxY >= world.getMaxHeight() - 2) {
+            throw new IllegalArgumentException("Invalid mine bounds");
+        }
         resetDelay = (Integer) me.get("resetDelay");
-        List<String> warnings = (List<String>) me.get("resetWarnings");
+        if (resetDelay < 0) throw new IllegalArgumentException("Negative reset interval");
+        List<?> warnings = (List<?>) me.get("resetWarnings");
         resetWarnings = new LinkedList<Integer>();
-        for (String warning : warnings) {
+        for (Object warning : warnings) {
             try {
-                resetWarnings.add(Integer.valueOf(warning));
+                int minutes = Integer.parseInt(warning.toString());
+                if (minutes > 0 && minutes < resetDelay && !resetWarnings.contains(minutes)) {
+                    resetWarnings.add(minutes);
+                }
             } catch (NumberFormatException nfe) {
                 throw new IllegalArgumentException("Non-numeric reset warnings supplied");
             }
@@ -101,7 +115,7 @@ public class Mine implements ConfigurationSerializable {
             resetClockSeconds = ((Number) me.get("resetClock")).longValue() * 60L;
         }
 
-        if (resetDelay > 0 && resetClockSeconds == 0) {
+        if (resetDelay > 0 && (resetClockSeconds <= 0 || resetClockSeconds > resetDelay * 60L)) {
             resetClockSeconds = resetDelay * 60L;
         }
         if (me.containsKey("isSilent")) {
@@ -152,12 +166,14 @@ public class Mine implements ConfigurationSerializable {
     }
 
     public void setResetDelay(int minutes) {
+        if (minutes < 0) throw new IllegalArgumentException("Negative reset interval");
         resetDelay = minutes;
+        resetWarnings.removeIf(warning -> warning >= minutes);
         resetClockSeconds = minutes * 60L;
     }
 
     public void setResetWarnings(List<Integer> warnings) {
-        resetWarnings = warnings;
+        resetWarnings = new ArrayList<Integer>(warnings);
     }
 
     public List<Integer> getResetWarnings() {
@@ -220,16 +236,22 @@ public class Mine implements ConfigurationSerializable {
     }
 
     public boolean isInside(Location l) {
+        return isInside(l, 0);
+    }
+
+    public boolean isInside(Location l, int blocksAbove) {
         return l.getWorld().equals(world)
             && (l.getBlockX() >= minX && l.getBlockX() <= maxX)
-            && (l.getBlockY() >= minY && l.getBlockY() <= maxY)
+            && (l.getBlockY() >= minY && l.getBlockY() <= maxY + blocksAbove)
             && (l.getBlockZ() >= minZ && l.getBlockZ() <= maxZ);
     }
 
     public void reset() {
 
         SerializableBlock singleBlock = null;
-        if (composition.size() == 1) {
+        if (composition.isEmpty()) {
+            singleBlock = new SerializableBlock(org.bukkit.Material.AIR);
+        } else if (composition.size() == 1) {
             Map.Entry<SerializableBlock, Double> entry = composition.entrySet().iterator().next();
             if (entry.getValue() == 1.0) {
                 singleBlock = entry.getKey();
@@ -240,14 +262,17 @@ public class Mine implements ConfigurationSerializable {
         for (Player p : world.getPlayers()) {
             Location l = p.getLocation();
             if (isInside(l)) {
-                p.teleport(new Location(world, l.getX(), maxY + 2D, l.getZ()));
+                l.setY(maxY + 1D);
+                if (!p.teleport(l)) {
+                    throw new IllegalStateException("Teleport cancelled for player: " + p.getName());
+                }
             }
         }
 
-        Random rand = singleBlock == null ? new Random() : null;
+        Random rand = singleBlock == null ? java.util.concurrent.ThreadLocalRandom.current() : null;
         for (int x = minX; x <= maxX; ++x) {
-            for (int y = minY; y <= maxY; ++y) {
-                for (int z = minZ; z <= maxZ; ++z) {
+            for (int z = minZ; z <= maxZ; ++z) {
+                for (int y = minY; y <= maxY; ++y) {
                     org.bukkit.block.Block block = world.getBlockAt(x, y, z);
                     if (!fillMode || block.getType().isAir()) {
                         if (y == maxY && surface != null) {
@@ -260,7 +285,7 @@ public class Mine implements ConfigurationSerializable {
                         }
                         double r = rand.nextDouble();
                         for (CompositionEntry ce : probabilityMap) {
-                            if (r <= ce.getChance()) {
+                            if (r < ce.getChance()) {
                                 ce.getBlock().apply(block);
                                 break;
                             }
@@ -279,11 +304,11 @@ public class Mine implements ConfigurationSerializable {
             resetClockSeconds--;
         }
         if (resetClockSeconds == 0) {
+            resetClockSeconds = resetDelay * 60L;
+            reset();
             if (!isSilent) {
                 MineResetLite.broadcast(Phrases.phrase("mineAutoResetBroadcast", this), this);
             }
-            reset();
-            resetClockSeconds = resetDelay * 60L;
             return;
         }
         for (Integer warning : resetWarnings) {
@@ -320,7 +345,7 @@ public class Mine implements ConfigurationSerializable {
         }
 
         if (max < 1) {
-            composition.put(new SerializableBlock(org.bukkit.Material.AIR), 1 - max);
+            composition.merge(new SerializableBlock(org.bukkit.Material.AIR), 1 - max, Double::sum);
             max = 1;
         }
         double i = 0;
@@ -328,6 +353,10 @@ public class Mine implements ConfigurationSerializable {
             double v = entry.getValue() / max;
             i += v;
             probabilityMap.add(new CompositionEntry(entry.getKey(), i));
+        }
+        if (!probabilityMap.isEmpty()) {
+            CompositionEntry last = probabilityMap.get(probabilityMap.size() - 1);
+            probabilityMap.set(probabilityMap.size() - 1, new CompositionEntry(last.getBlock(), 1.0));
         }
         return probabilityMap;
     }

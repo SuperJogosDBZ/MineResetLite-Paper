@@ -7,8 +7,6 @@ import org.bukkit.entity.Player;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 
 import static com.koletar.jj.mineresetlite.Phrases.phrase;
@@ -43,38 +41,36 @@ public class CommandManager {
             usage = "command.help.usage",
             min = 0, max = -1)
     public void help(CommandSender sender, String[] args) {
+        sender.sendMessage("\u00A78[\u00A74MRL\u00A78] \u00A7f" + phrase("command.help.description"));
         if (args.length >= 1) {
 
-            if (commands.containsKey(args[0].toLowerCase())) {
-                Command command = commands.get(args[0].toLowerCase()).getAnnotation(Command.class);
+            if (commands.containsKey(args[0].toLowerCase(java.util.Locale.ROOT))) {
+                Command command = commands.get(args[0].toLowerCase(java.util.Locale.ROOT)).getAnnotation(Command.class);
                 sender.sendMessage(phrase("helpUsage", command.aliases()[0], usage(command)));
                 for (String help : command.help()) {
-                    sender.sendMessage(ChatColor.GRAY + phrase(help));
+                    sender.sendMessage("  " + ChatColor.GRAY + phrase(help));
                 }
                 return;
             }
         }
-        List<Method> seenMethods = new LinkedList<Method>();
-        for (Map.Entry<String, Method> entry : commands.entrySet()) {
-            if (!seenMethods.contains(entry.getValue())) {
-                seenMethods.add(entry.getValue());
-                Command command = entry.getValue().getAnnotation(Command.class);
+        for (Method method : instances.keySet().stream()
+                .sorted(java.util.Comparator.comparing(m -> m.getAnnotation(Command.class).aliases()[0])).toList()) {
+            Command command = method.getAnnotation(Command.class);
 
-                if ((command.onlyPlayers() && !(sender instanceof Player))) {
-                    continue;
-                }
-                boolean may = command.permissions().length == 0;
-                for (String perm : command.permissions()) {
-                    if (sender.hasPermission(perm)) {
-                        may = true;
-                    }
-                }
-                if (!may) {
-                    continue;
-                }
-                sender.sendMessage(phrase("helpUsage", command.aliases()[0], usage(command)));
-                sender.sendMessage(phrase("helpDesc", phrase(command.description())));
+            if ((command.onlyPlayers() && !(sender instanceof Player))) {
+                continue;
             }
+            boolean may = command.permissions().length == 0;
+            for (String perm : command.permissions()) {
+                if (sender.hasPermission(perm)) {
+                    may = true;
+                }
+            }
+            if (!may) {
+                continue;
+            }
+            sender.sendMessage(phrase("helpUsage", command.aliases()[0], usage(command)));
+            sender.sendMessage(phrase("helpDesc", phrase(command.description())));
         }
 
     }
@@ -85,7 +81,7 @@ public class CommandManager {
 
     public void callCommand(String cmdName, CommandSender sender, String[] args) {
 
-        Method method = commands.get(cmdName.toLowerCase());
+        Method method = commands.get(cmdName.toLowerCase(java.util.Locale.ROOT));
         if (method == null) {
             sender.sendMessage(phrase("unknownCommand"));
             return;

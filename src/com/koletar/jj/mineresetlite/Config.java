@@ -2,9 +2,7 @@ package com.koletar.jj.mineresetlite;
 
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 
 public class Config {
@@ -21,67 +19,27 @@ public class Config {
         return broadcastNearbyOnly;
     }
 
-    private static void setBroadcastInWorldOnly(boolean broadcastInWorldOnly) {
-        Config.broadcastInWorldOnly = broadcastInWorldOnly;
-    }
-
-    private static void setBroadcastNearbyOnly(boolean broadcastNearbyOnly) {
-        Config.broadcastNearbyOnly = broadcastNearbyOnly;
-    }
-
-    public static void writeBroadcastInWorldOnly(BufferedWriter out) throws IOException {
-        out.write("broadcast-in-world-only: false");
-        out.newLine();
-    }
-
-    public static void writeBroadcastNearbyOnly(BufferedWriter out) throws IOException {
-        out.write("broadcast-nearby-only: false");
-        out.newLine();
-    }
-
     public static String getLocale() {
         return locale;
     }
 
-    protected static void setLocale(String locale) {
-        Config.locale = locale;
-    }
-
-    public static void writeLocale(BufferedWriter out) throws IOException {
-        out.write("locale: en");
-        out.newLine();
-    }
-
     public static void initConfig(File dataFolder) throws IOException {
-        if (!dataFolder.exists()) {
-            dataFolder.mkdir();
-        }
+        java.nio.file.Files.createDirectories(dataFolder.toPath());
         File configFile = new File(dataFolder, "config.yml");
-        if (!configFile.exists()) {
-            configFile.createNewFile();
-            BufferedWriter out = new BufferedWriter(new FileWriter(configFile));
-            Config.writeBroadcastInWorldOnly(out);
-            Config.writeBroadcastNearbyOnly(out);
-            Config.writeLocale(out);
-            out.close();
+        YamlConfiguration config = new YamlConfiguration();
+        if (configFile.exists()) {
+            try { config.load(configFile); }
+            catch (org.bukkit.configuration.InvalidConfigurationException ex) {
+                throw new IOException("Invalid config.yml", ex);
+            }
         }
-        YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
-        BufferedWriter out = new BufferedWriter(new FileWriter(configFile, true));
-        if (config.contains("broadcast-in-world-only")) {
-            Config.setBroadcastInWorldOnly(config.getBoolean("broadcast-in-world-only"));
-        } else {
-            Config.writeBroadcastInWorldOnly(out);
-        }
-        if (config.contains("broadcast-nearby-only")) {
-            Config.setBroadcastNearbyOnly(config.getBoolean("broadcast-nearby-only"));
-        } else {
-            Config.writeBroadcastNearbyOnly(out);
-        }
-        if (config.contains("locale")) {
-            Config.setLocale(config.getString("locale"));
-        } else {
-            Config.writeLocale(out);
-        }
-        out.close();
+        boolean changed = false;
+        if (!config.contains("broadcast-in-world-only")) { config.set("broadcast-in-world-only", false); changed = true; }
+        if (!config.contains("broadcast-nearby-only")) { config.set("broadcast-nearby-only", false); changed = true; }
+        if (!config.contains("locale")) { config.set("locale", "en"); changed = true; }
+        broadcastInWorldOnly = config.getBoolean("broadcast-in-world-only");
+        broadcastNearbyOnly = config.getBoolean("broadcast-nearby-only");
+        locale = config.getString("locale", "en");
+        if (changed) config.save(configFile);
     }
 }

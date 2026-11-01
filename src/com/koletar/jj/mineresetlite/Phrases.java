@@ -55,7 +55,10 @@ public class Phrases {
     }
 
     public static String findName(Object o) {
-        if (o instanceof Boolean) {
+        if (o instanceof Double || o instanceof Float) {
+            double value = Math.round(((Number) o).doubleValue() * 100) / 100D;
+            return value == (long) value ? Long.toString((long) value) : Double.toString(value);
+        } else if (o instanceof Boolean) {
             return phrase((Boolean) o ? "booleanTrue" : "booleanFalse");
         } else if (o instanceof Mine) {
             return ((Mine) o).getName();

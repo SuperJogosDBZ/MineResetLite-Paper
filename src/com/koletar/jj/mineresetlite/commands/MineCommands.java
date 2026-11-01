@@ -15,22 +15,27 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static com.koletar.jj.mineresetlite.Phrases.phrase;
 
-public class MineCommands {
+public class MineCommands implements org.bukkit.event.Listener {
     private MineResetLite plugin;
-    private Map<Player, Location> point1;
-    private Map<Player, Location> point2;
+    private Map<java.util.UUID, Location> point1;
+    private Map<java.util.UUID, Location> point2;
 
     public MineCommands(MineResetLite plugin) {
         this.plugin = plugin;
-        point1 = new HashMap<Player, Location>();
-        point2 = new HashMap<Player, Location>();
+        point1 = new HashMap<java.util.UUID, Location>();
+        point2 = new HashMap<java.util.UUID, Location>();
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+
+    @org.bukkit.event.EventHandler
+    public void onQuit(org.bukkit.event.player.PlayerQuitEvent event) {
+        point1.remove(event.getPlayer().getUniqueId());
+        point2.remove(event.getPlayer().getUniqueId());
     }
 
     @Command(aliases = {"list", "l"},
@@ -39,7 +44,7 @@ public class MineCommands {
             permissions = {"mineresetlite.mine.list"},
             min = 0, max = 0, onlyPlayers = false)
     public void listMines(CommandSender sender, String[] args) {
-        sender.sendMessage(phrase("mineList", StringTools.buildList(plugin.mines, "&c", "&d, ")));
+        sender.sendMessage(phrase("mineList", StringTools.buildList(plugin.mines, "&f", "&7, ")));
     }
 
     @Command(aliases = {"pos1", "p1"},
@@ -57,12 +62,12 @@ public class MineCommands {
                 player.sendMessage(phrase("notABlock"));
                 return;
             }
-            point1.put(player, target.getLocation());
+            point1.put(player.getUniqueId(), target.getLocation());
             player.sendMessage(phrase("firstPointSet"));
             return;
         } else if (args[0].equalsIgnoreCase("-feet")) {
 
-            point1.put(player, player.getLocation());
+            point1.put(player.getUniqueId(), player.getLocation());
             player.sendMessage(phrase("firstPointSet"));
             return;
         }
@@ -85,12 +90,12 @@ public class MineCommands {
                 player.sendMessage(phrase("notABlock"));
                 return;
             }
-            point2.put(player, target.getLocation());
+            point2.put(player.getUniqueId(), target.getLocation());
             player.sendMessage(phrase("secondPointSet"));
             return;
         } else if (args[0].equalsIgnoreCase("-feet")) {
 
-            point2.put(player, player.getLocation());
+            point2.put(player.getUniqueId(), player.getLocation());
             player.sendMessage(phrase("secondPointSet"));
             return;
         }
@@ -107,19 +112,6 @@ public class MineCommands {
     public void createMine(CommandSender sender, String[] args) {
 
         Player player = (Player) sender;
-        World world = null;
-        Vector p1 = null;
-        Vector p2 = null;
-
-        if (point1.containsKey(player) && point2.containsKey(player)) {
-            world = point1.get(player).getWorld();
-            if (!world.equals(point2.get(player).getWorld())) {
-                player.sendMessage(phrase("crossWorldSelection"));
-                return;
-            }
-            p1 = point1.get(player).toVector();
-            p2 = point2.get(player).toVector();
-        }
         Location[] selection;
         try {
             selection = com.koletar.jj.mineresetlite.WorldEditSelection.get(plugin, player);
@@ -127,40 +119,37 @@ public class MineCommands {
             player.sendMessage(ex.getMessage());
             return;
         }
-        if (selection != null) {
-            world = selection[0].getWorld();
-            p1 = selection[0].toVector();
-            p2 = selection[1].toVector();
+        if (selection == null) {
+            Location first = point1.get(player.getUniqueId());
+            Location second = point2.get(player.getUniqueId());
+            if (first == null || second == null) {
+                player.sendMessage(phrase("emptySelection"));
+                return;
+            }
+            selection = new Location[] {first, second};
         }
-        if (p1 == null) {
-            player.sendMessage(phrase("emptySelection"));
+        if (!selection[0].getWorld().equals(selection[1].getWorld())) {
+            player.sendMessage(phrase("crossWorldSelection"));
             return;
         }
+        World world = selection[0].getWorld();
+        Vector p1 = Vector.getMinimum(selection[0].toVector(), selection[1].toVector());
+        Vector p2 = Vector.getMaximum(selection[0].toVector(), selection[1].toVector());
 
         String name = StringTools.buildSpacedArgument(args);
 
-        Mine[] mines = plugin.matchMines(name);
-        if (mines.length > 0) {
-            player.sendMessage(phrase("nameInUse", name));
+        for (Mine mine : plugin.mines) {
+            if (mine.getName().equalsIgnoreCase(name)) {
+                player.sendMessage(phrase("nameInUse", name));
+                return;
+            }
+        }
+
+        if (!plugin.isMineNameAvailable(name)) {
+            player.sendMessage(phrase("invalidMineName"));
             return;
         }
 
-        if (p1.getX() > p2.getX()) {
-
-            double x = p1.getX();
-            p1.setX(p2.getX());
-            p2.setX(x);
-        }
-        if (p1.getY() > p2.getY()) {
-            double y = p1.getY();
-            p1.setY(p2.getY());
-            p2.setY(y);
-        }
-        if (p1.getZ() > p2.getZ()) {
-            double z = p1.getZ();
-            p1.setZ(p2.getZ());
-            p2.setZ(z);
-        }
         if (p1.getBlockY() < world.getMinHeight() || p2.getBlockY() >= world.getMaxHeight() - 2) {
             player.sendMessage(phrase("mineHeightInvalid"));
             return;
@@ -192,13 +181,13 @@ public class MineCommands {
 
         StringBuilder csb = new StringBuilder();
         for (Map.Entry<SerializableBlock, Double> entry : mines[0].getComposition().entrySet()) {
-            csb.append(entry.getValue() * 100);
+            csb.append(com.koletar.jj.mineresetlite.Phrases.findName(entry.getValue() * 100));
             csb.append("% ");
             csb.append(entry.getKey());
             csb.append(", ");
         }
         if (csb.length() > 2) {
-            csb.delete(csb.length() - 2, csb.length() - 1);
+            csb.delete(csb.length() - 2, csb.length());
         }
         sender.sendMessage(phrase("mineInfoComposition", csb));
         if (mines[0].getResetDelay() != 0) {
@@ -246,11 +235,9 @@ public class MineCommands {
             sender.sendMessage(phrase("badPercentage"));
             return;
         }
-        StringBuilder psb = new StringBuilder(percentageS);
-        psb.deleteCharAt(psb.length() - 1);
-        double percentage = 0;
+        double percentage;
         try {
-            percentage = Double.valueOf(psb.toString());
+            percentage = Double.parseDouble(percentageS.substring(0, percentageS.length() - 1));
         } catch (NumberFormatException nfe) {
             sender.sendMessage(phrase("badPercentage"));
             return;
@@ -260,28 +247,14 @@ public class MineCommands {
             return;
         }
         percentage = percentage / 100;
-        SerializableBlock block = parsedBlock;
-        Double oldPercentage = mines[0].getComposition().get(block);
-        double total = 0;
-        for (Map.Entry<SerializableBlock, Double> entry : mines[0].getComposition().entrySet()) {
-            if (!entry.getKey().equals(block)) {
-                total += entry.getValue();
-            } else {
-                block = entry.getKey();
-            }
-        }
-        total += percentage;
-        if (total > 1) {
+        double total = mines[0].getCompositionTotal()
+                - mines[0].getComposition().getOrDefault(parsedBlock, 0D) + percentage;
+        if (total > 1 + 1e-12) {
             sender.sendMessage(phrase("insaneCompositionChange"));
-            if (oldPercentage == null) {
-                mines[0].getComposition().remove(block);
-            } else {
-                mines[0].getComposition().put(block, oldPercentage);
-            }
             return;
         }
-        mines[0].getComposition().put(block, percentage);
-        sender.sendMessage(phrase("mineCompositionSet", mines[0], percentage * 100, block, (1 - mines[0].getCompositionTotal()) * 100));
+        mines[0].getComposition().put(parsedBlock, percentage);
+        sender.sendMessage(phrase("mineCompositionSet", mines[0], percentage * 100, parsedBlock, Math.max(0, 1 - total) * 100));
         plugin.buffSave();
     }
 
@@ -309,17 +282,13 @@ public class MineCommands {
             return;
         }
 
-        SerializableBlock block = parsedBlock;
-        for (Map.Entry<SerializableBlock, Double> entry : mines[0].getComposition().entrySet()) {
-            if (entry.getKey().equals(block)) {
-                mines[0].getComposition().remove(entry.getKey());
-                plugin.buffSave();
-                sender.sendMessage(phrase("blockRemovedFromMine", mines[0], block, (1 - mines[0].getCompositionTotal()) * 100));
-                return;
-            }
+        if (mines[0].getComposition().remove(parsedBlock) != null) {
+            plugin.buffSave();
+            sender.sendMessage(phrase("blockRemovedFromMine", mines[0], parsedBlock,
+                    Math.max(0, 1 - mines[0].getCompositionTotal()) * 100));
+        } else {
+            sender.sendMessage(phrase("blockNotInMine", mines[0], parsedBlock));
         }
-        sender.sendMessage(phrase("blockNotInMine", mines[0], block));
-        plugin.buffSave();
     }
 
     @Command(aliases = {"reset", "r"},
@@ -329,7 +298,8 @@ public class MineCommands {
             permissions = {"mineresetlite.mine.reset"},
             min = 1, max = -1, onlyPlayers = false)
     public void resetMine(CommandSender sender, String[] args) {
-        Mine[] mines = plugin.matchMines(StringTools.buildSpacedArgument(args).replace(" -s", ""));
+        boolean silent = args[args.length - 1].equalsIgnoreCase("-s");
+        Mine[] mines = plugin.matchMines(StringTools.buildSpacedArgument(args, silent ? 1 : 0));
         if (mines.length > 1) {
             sender.sendMessage(phrase("tooManyMines"));
             return;
@@ -337,12 +307,9 @@ public class MineCommands {
             sender.sendMessage(phrase("noMinesMatched"));
             return;
         }
-        if (args[args.length - 1].equalsIgnoreCase("-s")) {
-
-            mines[0].reset();
-        } else {
+        mines[0].reset();
+        if (!silent) {
             MineResetLite.broadcast(phrase("mineResetBroadcast", mines[0], sender), mines[0]);
-            mines[0].reset();
         }
     }
 
@@ -384,37 +351,25 @@ public class MineCommands {
             plugin.buffSave();
             return;
         } else if (setting.equalsIgnoreCase("resetWarnings") || setting.equalsIgnoreCase("resetWarning")) {
-            String[] bits = value.split(",");
-            List<Integer> warnings = mines[0].getResetWarnings();
-            List<Integer> oldList = new LinkedList<Integer>(warnings);
-            warnings.clear();
-            for (String bit : bits) {
+            List<Integer> warnings = new java.util.ArrayList<Integer>();
+            if (!value.equals("0")) {
                 try {
-                    warnings.add(Integer.valueOf(bit));
-                } catch (NumberFormatException nfe) {
+                    for (String bit : value.split(",", -1)) {
+                        int warning = Integer.parseInt(bit);
+                        if (warning <= 0 || warning >= mines[0].getResetDelay()) {
+                            throw new NumberFormatException();
+                        }
+                        if (!warnings.contains(warning)) warnings.add(warning);
+                    }
+                } catch (NumberFormatException ex) {
                     sender.sendMessage(phrase("badWarningList"));
                     return;
                 }
+                warnings.sort(java.util.Comparator.reverseOrder());
             }
-
-            for (Integer warning : warnings) {
-                if (warning >= mines[0].getResetDelay()) {
-                    sender.sendMessage(phrase("badWarningList"));
-                    mines[0].setResetWarnings(oldList);
-                    return;
-                }
-            }
-            if (warnings.contains(0) && warnings.size() == 1) {
-                warnings.clear();
-                sender.sendMessage(phrase("warningListCleared", mines[0]));
-                return;
-            } else if (warnings.contains(0)) {
-                sender.sendMessage(phrase("badWarningList"));
-                mines[0].setResetWarnings(oldList);
-                return;
-            }
-            sender.sendMessage(phrase("warningListSet", mines[0]));
+            mines[0].setResetWarnings(warnings);
             plugin.buffSave();
+            sender.sendMessage(phrase(warnings.isEmpty() ? "warningListCleared" : "warningListSet", mines[0]));
             return;
         } else if (setting.equalsIgnoreCase("surface")) {
 
@@ -451,6 +406,7 @@ public class MineCommands {
                 return;
             }
             sender.sendMessage(phrase("invalidFillMode"));
+            return;
         } else if (setting.equalsIgnoreCase("isSilent") || setting.equalsIgnoreCase("silent") || setting.equalsIgnoreCase("silence")) {
             if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("yes") || value.equalsIgnoreCase("enabled")) {
                 mines[0].setSilence(true);
@@ -464,6 +420,7 @@ public class MineCommands {
                 return;
             }
             sender.sendMessage(phrase("badBoolean"));
+            return;
         }
         sender.sendMessage(phrase("unknownFlag"));
     }
@@ -482,8 +439,7 @@ public class MineCommands {
             sender.sendMessage(phrase("noMinesMatched"));
             return;
         }
-        plugin.eraseMine(mines[0]);
-        sender.sendMessage(phrase("mineErased", mines[0]));
+        sender.sendMessage(phrase(plugin.eraseMine(mines[0]) ? "mineErased" : "mineEraseFailed", mines[0]));
     }
     @Command(aliases = {"stagger"},
             description = "command.stagger.description",
