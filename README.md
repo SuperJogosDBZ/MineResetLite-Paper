@@ -4,22 +4,18 @@ Changes compared with the original [jjkoletar/MineResetLite](https://github.com/
 
 - Updated for modern Paper, starting with 1.21.11; tested on 1.21.11 and 26.3.
 - Modernized block handling and added support for reading TeamVK composition and surface entries such as `STONE:0`.
-- Fixed saving after removing composition entries and corrected delayed-save task handling.
-- Optimized resets for a single block at 100%, reused block lookups, and limited player checks to the mine's world.
+- Fixed composition updates, air distribution, reset-warning validation, and saving after removing composition entries or clearing warnings.
+- Preserved loaded mine filenames when saving and deleting, reported failed deletions, and grouped pending saves without repeatedly postponing them.
+- Optimized resets for a single block at 100%, filled empty compositions directly with air, reused block lookups, and limited player checks to the mine's world.
+- Fixed mine creation with partially similar names, selection handling, and filename conflicts.
+- Preserved player direction during reset teleportation, stopped block changes when a teleport is cancelled, and corrected local reset announcements.
 - Added `/mrl stagger <spacing seconds> <interval minutes>` to distribute resets for matching mines; extra mines share time slots, and other intervals stay unchanged.
-- Revised messages and command help in all eight bundled languages; custom messages are read as UTF-8.
-- Updated optional WorldEdit/FAWE selection integration.
+- Revised messages and command help in all eight bundled languages, standardized the `&8[&4MRL&8]` prefix and status colors, and limited displayed percentages to two decimal places without changing stored precision. Custom messages are read as UTF-8.
+- Updated optional WorldEdit/FAWE integration for cuboid selections. Resets use Bukkit/Paper, independently of these integrations.
+- Simplified configuration handling and cleaned up player selections on disconnect.
 - Removed obsolete code, legacy metrics, and the update checker.
-- Validated functionality and persistence on local Paper servers.
+- Validated commands, automatic timers, broadcasts, persistence, and migration from older mine files on local Paper servers.
 
-## 1.0.3-paper
+Build with Java 21 and `mvn package`. The plugin JAR is generated in `target/`.
 
-- Standardized all eight translations with the `&8[&4MRL&8]` prefix and consistent message colors.
-- Fixed selection handling, partial-name conflicts during creation, composition updates, and air distribution.
-- Fixed reset-warning validation and saving, preserved loaded mine filenames, and corrected local announcements after teleportation.
-- Kept direct YAML saves and synchronous resets; empty compositions fill with air without per-block random selection.
-- Validated migration from 1.0.2-paper, commands, timers, persistence, broadcasts, and UTF-8 overrides on Paper 1.21.11 with two connected clients, with and without WorldEdit.
-
-WorldEdit/FAWE integration reads cuboid selections only; resets use Bukkit/Paper. WorldEdit 7.4.2 was tested; FAWE was not tested. Large synchronous resets can still cause pauses.
-
-Build with Java 21 and `mvn package`. The plugin JAR is generated at `target/mineresetlite-1.0.3-paper.jar`.
+Resets remain synchronous; large mines can cause pauses. WorldEdit 7.4.2 was tested; FAWE was not tested. Custom message overrides take precedence over bundled messages.
