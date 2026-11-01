@@ -18,8 +18,8 @@ Changes compared with the original [jjkoletar/MineResetLite](https://github.com/
 - Fixed selection handling, partial-name conflicts during creation, composition updates, and air distribution.
 - Fixed reset-warning validation and saving, preserved loaded mine filenames, and corrected local announcements after teleportation.
 - Kept direct YAML saves and synchronous resets; empty compositions fill with air without per-block random selection.
-- Added 24 automated regression tests. Validated migration from 1.0.2-paper, commands, timers, persistence, broadcasts, and UTF-8 overrides on Paper 1.21.11 with two connected clients, with and without WorldEdit.
+- Validated migration from 1.0.2-paper, commands, timers, persistence, broadcasts, and UTF-8 overrides on Paper 1.21.11 with two connected clients, with and without WorldEdit.
 
 WorldEdit/FAWE integration reads cuboid selections only; resets use Bukkit/Paper. WorldEdit 7.4.2 was tested; FAWE was not tested. Large synchronous resets can still cause pauses.
 
-Build and run the automated tests with Java 21 and `mvn package`. The plugin JAR is generated at `target/mineresetlite-1.0.3-paper.jar`.
+Build with Java 21 and `mvn package`. The plugin JAR is generated at `target/mineresetlite-1.0.3-paper.jar`.
